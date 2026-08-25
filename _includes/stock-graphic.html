@@ -1,0 +1,240 @@
+<div class="stock-carousel">
+  <style>
+    .stock-carousel {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      width: 100%;
+      max-width: 320px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px;
+      box-sizing: border-box;
+    }
+    .stock-carousel * {
+      box-sizing: border-box;
+    }
+    .stock-carousel .sc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .stock-carousel .sc-ticker-block {
+      display: flex;
+      flex-direction: column;
+    }
+    .stock-carousel .sc-symbol {
+      font-weight: 700;
+      font-size: 15px;
+      color: #1a1a1a;
+    }
+    .stock-carousel .sc-name {
+      font-size: 11px;
+      color: #888;
+    }
+    .stock-carousel .sc-price-block {
+      text-align: right;
+    }
+    .stock-carousel .sc-price {
+      font-weight: 700;
+      font-size: 15px;
+      color: #1a1a1a;
+    }
+    .stock-carousel .sc-change {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .stock-carousel .sc-change.positive {
+      color: #16a34a;
+    }
+    .stock-carousel .sc-change.negative {
+      color: #dc2626;
+    }
+    .stock-carousel .sc-chart-wrap {
+      width: 100%;
+      height: 90px;
+      margin: 6px 0 10px;
+    }
+    .stock-carousel .sc-chart-wrap svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .stock-carousel .sc-days {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    .stock-carousel .sc-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .stock-carousel .sc-arrow {
+      background: #f2f2f2;
+      border: none;
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #444;
+      font-size: 13px;
+      line-height: 1;
+      user-select: none;
+    }
+    .stock-carousel .sc-arrow:hover {
+      background: #e6e6e6;
+    }
+    .stock-carousel .sc-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .stock-carousel .sc-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ddd;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .stock-carousel .sc-dot.active {
+      background: #1a1a1a;
+    }
+  </style>
+
+  <div class="sc-header">
+    <div class="sc-ticker-block">
+      <span class="sc-symbol" id="sc-symbol">AAPL</span>
+      <span class="sc-name" id="sc-name">Apple Inc.</span>
+    </div>
+    <div class="sc-price-block">
+      <div class="sc-price" id="sc-price">$187.42</div>
+      <div class="sc-change positive" id="sc-change">+3.15 (1.71%)</div>
+    </div>
+  </div>
+
+  <div class="sc-chart-wrap">
+    <svg id="sc-svg" viewBox="0 0 300 90" preserveAspectRatio="none"></svg>
+  </div>
+
+  <div class="sc-days">
+    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+  </div>
+
+  <div class="sc-controls">
+    <button class="sc-arrow" id="sc-prev" aria-label="Previous stock">&#10094;</button>
+    <div class="sc-dots" id="sc-dots"></div>
+    <button class="sc-arrow" id="sc-next" aria-label="Next stock">&#10095;</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var stocks = [
+    {
+      symbol: "AAPL",
+      name: "Apple Inc.",
+      prices: [184.27, 185.10, 183.92, 186.55, 185.80, 186.90, 187.42],
+      color: "#16a34a"
+    },
+    {
+      symbol: "TSLA",
+      name: "Tesla, Inc.",
+      prices: [242.80, 238.15, 231.40, 225.90, 220.35, 216.10, 211.75],
+      color: "#dc2626"
+    },
+    {
+      symbol: "MSFT",
+      name: "Microsoft Corp.",
+      prices: [412.30, 414.85, 411.20, 417.60, 419.90, 421.15, 423.60],
+      color: "#16a34a"
+    }
+  ];
+
+  var current = 0;
+  var symbolEl = document.getElementById("sc-symbol");
+  var nameEl = document.getElementById("sc-name");
+  var priceEl = document.getElementById("sc-price");
+  var changeEl = document.getElementById("sc-change");
+  var svgEl = document.getElementById("sc-svg");
+  var dotsEl = document.getElementById("sc-dots");
+  var prevBtn = document.getElementById("sc-prev");
+  var nextBtn = document.getElementById("sc-next");
+
+  function buildDots() {
+    dotsEl.innerHTML = "";
+    stocks.forEach(function (s, i) {
+      var dot = document.createElement("div");
+      dot.className = "sc-dot" + (i === current ? " active" : "");
+      dot.addEventListener("click", function () {
+        current = i;
+        render();
+      });
+      dotsEl.appendChild(dot);
+    });
+  }
+
+  function buildPath(prices) {
+    var w = 300, h = 90, pad = 6;
+    var min = Math.min.apply(null, prices);
+    var max = Math.max.apply(null, prices);
+    var range = max - min || 1;
+    var step = (w - pad * 2) / (prices.length - 1);
+    var points = prices.map(function (p, i) {
+      var x = pad + i * step;
+      var y = h - pad - ((p - min) / range) * (h - pad * 2);
+      return x.toFixed(2) + "," + y.toFixed(2);
+    });
+    return points.join(" ");
+  }
+
+  function render() {
+    var s = stocks[current];
+    symbolEl.textContent = s.symbol;
+    nameEl.textContent = s.name;
+
+    var first = s.prices[0];
+    var last = s.prices[s.prices.length - 1];
+    var diff = last - first;
+    var pct = (diff / first) * 100;
+    var isPositive = diff >= 0;
+
+    priceEl.textContent = "$" + last.toFixed(2);
+    changeEl.textContent = (isPositive ? "+" : "") + diff.toFixed(2) + " (" + (isPositive ? "+" : "") + pct.toFixed(2) + "%)";
+    changeEl.className = "sc-change " + (isPositive ? "positive" : "negative");
+
+    var points = buildPath(s.prices);
+    var lineColor = isPositive ? "#16a34a" : "#dc2626";
+    var fillId = "sc-fill-" + current;
+
+    svgEl.innerHTML =
+      '<defs>' +
+        '<linearGradient id="' + fillId + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="' + lineColor + '" stop-opacity="0.3"/>' +
+          '<stop offset="100%" stop-color="' + lineColor + '" stop-opacity="0"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<polyline points="' + points + '" fill="none" stroke="' + lineColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<polygon points="6,90 ' + points + ' 294,90" fill="url(#' + fillId + ')" stroke="none"/>';
+
+    buildDots();
+  }
+
+  prevBtn.addEventListener("click", function () {
+    current = (current - 1 + stocks.length) % stocks.length;
+    render();
+  });
+
+  nextBtn.addEventListener("click", function () {
+    current = (current + 1) % stocks.length;
+    render();
+  });
+
+  render();
+})();
+</script>
